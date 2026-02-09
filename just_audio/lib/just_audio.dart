@@ -458,6 +458,8 @@ class AudioPlayer {
     }
   }
 
+  _ProxyHttpServer get proxy => _proxy;
+
   /// The first [AudioSource] in the playlist, if any.
   AudioSource? get audioSource => _playlist.children.firstOrNull;
 
@@ -2519,18 +2521,28 @@ class _ProxyHttpServer {
   /// Starts the server.
   Future<dynamic> start() async {
     _running = true;
-    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    _server.listen((request) async {
-      if (request.method == 'GET') {
-        final uriPath = _requestKey(request.uri);
-        final handler = _handlerMap[uriPath]!;
-        handler(this, request);
-      }
-    }, onDone: () {
+    try {
+      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      _server.listen((request) async {
+        if (request.method == 'GET') {
+          final uriPath = _requestKey(request.uri);
+          final handler = _handlerMap[uriPath]!;
+          handler(this, request);
+        }
+      }, onDone: () {
+        _running = false;
+      }, onError: (Object e, StackTrace st) async {
+        _running = false;
+        try {
+          await _server.close(force: true);
+        } catch (_) {
+          // ignore
+        }
+      }, cancelOnError: true);
+    } catch (_) {
+      // ignore
       _running = false;
-    }, onError: (Object e, StackTrace st) {
-      _running = false;
-    });
+    }
   }
 
   /// Stops the server
